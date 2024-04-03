@@ -73,38 +73,30 @@ function parseBody(content: string, contentType: string) {
     }
 }
 
-function handleRequest(req: IncomingMessage, res: ServerResponse, bodyStr: string) {
+function handleRequest(req: IncomingMessage, bodyStr: string) {
     let response = {
         status: 200,
         body: {}
     }
 
-    let body = {}
     const contentType = getContentType(req)
-    try {
-        body = parseBody(bodyStr, contentType)
-    }
-    catch {
-        response.status = 400
-        response.body = {message: "Invalid body"}
-        return response
-    }
+    const query = extractQuery(req.url || "")
+    const body = parseBody(bodyStr, contentType)
+    const headers = req.headers
 
     let matches = 0
     for (const { path, method, callback } of routes) {
         if (!routesMatching(req.url, path) || !methodsMatching(req.method, method))
             continue
-    
+
         matches++
+        const request = {
+            query, body, headers,
+            params: extractParams(req.url || "", path)
+        }
+    
         let stop = true
         const next = () => { stop = false }
-        
-        const request = {
-            params: extractParams(req.url || "", path),
-            query: extractQuery(req.url || ""),
-            headers: req.headers,
-            body
-        }
         
         try {
             request.body = parseBody(bodyStr, contentType)
@@ -144,7 +136,20 @@ export const server = createServer((req, res) => {
         response.body = { message: "Unknown error" }
     })
     .on('end', () => {
-        response = handleRequest(req, res, bodyStr)
+        try {
+            response = handleRequest(req, bodyStr)
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                console.error(error)
+                response.status = 500
+                response.body = {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                }
+            }
+        }
         res.writeHead(response.status, {'Content-Type': 'application/json'})
         res.write(JSON.stringify(response.body))
         res.end()
