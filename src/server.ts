@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse, createServer } from 'http'
 import { routes, errorHandlers } from './'
-import { Method } from './types'
+import { ErrorHandler, Method } from './types'
 
 function routesMatching(url: string | undefined, path: string) {
     if (path === "*") return true
@@ -73,49 +73,65 @@ function parseBody(content: string, contentType: string) {
     }
 }
 
+const defaultErrorHandler: ErrorHandler = (error, req, res, next) => {
+    if (error instanceof Error) {
+        console.error(error)
+        res.status = 500
+        res.body = {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        }
+    }
+    next()
+}
+
 function handleRequest(req: IncomingMessage, bodyStr: string) {
     let response = {
         status: 200,
         body: {}
     }
 
-    const contentType = getContentType(req)
-    const query = extractQuery(req.url || "")
-    const body = parseBody(bodyStr, contentType)
-    const headers = req.headers
+    const request = {
+        query: extractQuery(req.url || ""),
+        headers: req.headers,
+        params: new Map(),
+        body: {}
+    }
 
-    let matches = 0
-    for (const { path, method, callback } of routes) {
-        if (!routesMatching(req.url, path) || !methodsMatching(req.method, method))
-            continue
-
-        matches++
-        const request = {
-            query, body, headers,
-            params: extractParams(req.url || "", path)
-        }
+    try {
+        let matches = 0
+        request.body = parseBody(bodyStr, getContentType(req))
     
-        let stop = true
-        const next = () => { stop = false }
+        for (const { path, method, callback } of routes) {
+            if (!routesMatching(req.url, path) || !methodsMatching(req.method, method))
+                continue
+    
+            matches++
+            request.params = extractParams(req.url || "", path)
         
-        try {
-            request.body = parseBody(bodyStr, contentType)
+            let stop = true
+            const next = () => { stop = false }
+            
             callback(request, response, next)
             if (stop)
                 break
         }
-        catch (error) {
-            for (const handler of errorHandlers) {
-                handler(error, request, response, next)
-                if (stop)
-                    break
-            }
+
+        if (matches < 1) {
+            response.status = 404
+            response.body = {message: "Not found"}
         }
     }
+    catch (error) {
+        let stop = true
+        const next = () => { stop = false }
 
-    if (matches < 1) {
-        response.status = 404
-        response.body = {message: "Not found"}
+        for (const handler of [...errorHandlers, defaultErrorHandler]) {
+            handler(error, request, response, next)
+            if (stop)
+                break
+        }
     }
 
     return response
@@ -136,20 +152,7 @@ export const server = createServer((req, res) => {
         response.body = { message: "Unknown error" }
     })
     .on('end', () => {
-        try {
-            response = handleRequest(req, bodyStr)
-        }
-        catch (error) {
-            if (error instanceof Error) {
-                console.error(error)
-                response.status = 500
-                response.body = {
-                    name: error.name,
-                    message: error.message,
-                    stack: error.stack
-                }
-            }
-        }
+        response = handleRequest(req, bodyStr)
         res.writeHead(response.status, {'Content-Type': 'application/json'})
         res.write(JSON.stringify(response.body))
         res.end()
