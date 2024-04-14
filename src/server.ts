@@ -113,7 +113,9 @@ function handleRequest(req: IncomingMessage, bodyStr: string) {
             let stop = true
             const next = () => { stop = false }
             
-            callback(request, response, next)
+            const cb = callback(request, response, next)
+            if (cb !== undefined)
+                response.body = cb
             if (stop)
                 break
         }
@@ -127,8 +129,11 @@ function handleRequest(req: IncomingMessage, bodyStr: string) {
         let stop = true
         const next = () => { stop = false }
 
+        response.status = 500
         for (const handler of [...errorHandlers, defaultErrorHandler]) {
-            handler(error, request, response, next)
+            const cb = handler(error, request, response, next)
+            if (cb !== undefined)
+                response.body = cb
             if (stop)
                 break
         }

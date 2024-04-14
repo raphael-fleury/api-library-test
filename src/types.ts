@@ -23,14 +23,14 @@ export type Callback = (
     request: HttpRequest,
     response: HttpResponse,
     next: () => void
-) => void
+) => any
 
 export type ErrorHandler = (
     error: unknown,
     request: HttpRequest,
     response: HttpResponse,
     next: () => void
-) => void
+) => any
 
 export type Route = {
     path: string,
