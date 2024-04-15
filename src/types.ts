@@ -1,4 +1,4 @@
-import { IncomingHttpHeaders } from 'http'
+import { HttpRequest } from './request'
 
 export const methods = [
     "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
@@ -6,17 +6,6 @@ export const methods = [
 ] as const
 
 export type Method = typeof methods[number]
-
-export type HttpRequest = {
-    url: string,
-    params: Map<string, string>,
-    query: URLSearchParams,
-    body: any,
-    headers: IncomingHttpHeaders,
-    method: Method,
-    host: string,
-    hostname: string
-}
 
 export type HttpResponse = {
     status: number,

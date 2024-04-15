@@ -1,6 +1,7 @@
-import { IncomingMessage, ServerResponse, createServer } from 'http'
+import { IncomingMessage, createServer } from 'http'
 import { routes, errorHandlers } from './'
 import { ErrorHandler, Method } from './types'
+import { HttpRequest } from './request'
 
 function routesMatching(url: string | undefined, path: string) {
     if (path === "*") return true
@@ -48,32 +49,6 @@ function extractParams(url: string, path: string) {
     return params
 }
 
-function extractQuery(url: string) {
-    if (!url.includes('?'))
-        return new URLSearchParams('')
-
-    const query = url.split('/').pop()?.split('?').pop() || ""
-    return new URLSearchParams(query)
-}
-
-function getContentType(req: IncomingMessage) {
-    const header = req.headers
-    if (!header["content-type"])
-        return ''
-
-    return header["content-type"].indexOf(";") === -1
-        ? header["content-type"]
-        : header["content-type"].substring(
-            0, header["content-type"].indexOf(";")
-        )
-}
-
-function parseBody(content: string, contentType: string) {
-    if (contentType === "application/json") {
-        return content ? JSON.parse(content) : {}
-    }
-}
-
 const defaultErrorHandler: ErrorHandler = (error, req, res, next) => {
     if (error instanceof Error) {
         console.error(error)
@@ -93,24 +68,10 @@ function handleRequest(req: IncomingMessage, bodyStr: string) {
         body: {}
     }
 
-    const host = req.headers.host || ""
-    const request = {
-        query: extractQuery(req.url || ""),
-        headers: req.headers,
-        params: new Map(),
-        body: {},
-
-        url: req.url || "",
-        method: (req.method || "") as Method,
-        host,
-        hostname: host.split(':')[0],
-        path: (req.url || "").split('?')[0]
-    }
+    const request = new HttpRequest(req, bodyStr)
 
     try {
         let matches = 0
-        request.body = parseBody(bodyStr, getContentType(req))
-    
         for (const { path, method, callback } of routes) {
             if (!routesMatching(req.url, path) || !methodsMatching(req.method, method))
                 continue
@@ -161,6 +122,7 @@ export const server = createServer((req, res) => {
         bodyStr += chunk.toString()
     })
     .on('error', (error) => {
+        console.error(error)
         response.status = 500
         response.body = { message: "Unknown error" }
     })
