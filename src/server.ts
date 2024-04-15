@@ -10,13 +10,14 @@ function routesMatching(url: string | undefined, path: string) {
     const pathSplit = path.split('/')
 
     for (const index in urlSplit) {
+        const pathWithoutQuery = urlSplit[index].split('?')[0]
         if (pathSplit[index] === undefined)
             return false
         if (pathSplit[index] === '*')
             continue
         if (pathSplit[index][0] === ':')
             continue
-        if (pathSplit[index] !== urlSplit[index])
+        if (pathSplit[index] !== pathWithoutQuery)
             return false
     }
 
@@ -92,11 +93,18 @@ function handleRequest(req: IncomingMessage, bodyStr: string) {
         body: {}
     }
 
+    const host = req.headers.host || ""
     const request = {
         query: extractQuery(req.url || ""),
         headers: req.headers,
         params: new Map(),
-        body: {}
+        body: {},
+
+        url: req.url || "",
+        method: (req.method || "") as Method,
+        host,
+        hostname: host.split(':')[0],
+        path: (req.url || "").split('?')[0]
     }
 
     try {

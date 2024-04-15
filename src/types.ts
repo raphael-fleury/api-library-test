@@ -8,10 +8,14 @@ export const methods = [
 export type Method = typeof methods[number]
 
 export type HttpRequest = {
+    url: string,
     params: Map<string, string>,
     query: URLSearchParams,
     body: any,
-    headers: IncomingHttpHeaders
+    headers: IncomingHttpHeaders,
+    method: Method,
+    host: string,
+    hostname: string
 }
 
 export type HttpResponse = {
