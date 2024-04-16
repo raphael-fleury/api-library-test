@@ -2,6 +2,7 @@ import { IncomingMessage, createServer } from 'http'
 import { routes, errorHandlers } from './'
 import { ErrorHandler, Method } from './types'
 import { HttpRequest } from './request'
+import { HttpResponse } from './response'
 
 function routesMatching(url: string | undefined, path: string) {
     if (path === "*") return true
@@ -41,9 +42,10 @@ function extractParams(url: string, path: string) {
             break
         if (pathSplit[index][0] !== ':')
             continue
-
+        
         const key = pathSplit[index].substring(1)
-        params.set(key, urlSplit[index])
+        const pathWithoutQuery = urlSplit[index].split('?')[0]
+        params.set(key, pathWithoutQuery)
     }
 
     return params
@@ -52,23 +54,18 @@ function extractParams(url: string, path: string) {
 const defaultErrorHandler: ErrorHandler = (error, req, res, next) => {
     if (error instanceof Error) {
         console.error(error)
-        res.status = 500
-        res.body = {
+        res.status(500).send({
             name: error.name,
             message: error.message,
             stack: error.stack
-        }
+        })
     }
     next()
 }
 
 function handleRequest(req: IncomingMessage, bodyStr: string) {
-    let response = {
-        status: 200,
-        body: {}
-    }
-
     const request = new HttpRequest(req, bodyStr)
+    const response = new HttpResponse(200, '')
 
     try {
         let matches = 0
@@ -90,7 +87,7 @@ function handleRequest(req: IncomingMessage, bodyStr: string) {
         }
 
         if (matches < 1) {
-            response.status = 404
+            response.statusCode = 404
             response.body = {message: "Not found"}
         }
     }
@@ -98,7 +95,7 @@ function handleRequest(req: IncomingMessage, bodyStr: string) {
         let stop = true
         const next = () => { stop = false }
 
-        response.status = 500
+        response.statusCode = 500
         for (const handler of [...errorHandlers, defaultErrorHandler]) {
             const cb = handler(error, request, response, next)
             if (cb !== undefined)
@@ -112,10 +109,7 @@ function handleRequest(req: IncomingMessage, bodyStr: string) {
 }
 
 export const server = createServer((req, res) => {
-    let response = {
-        status: 200,
-        body: {}
-    }
+    let response = new HttpResponse(200, '')
 
     let bodyStr = ''
     req.on('data', (chunk) => {
@@ -123,13 +117,22 @@ export const server = createServer((req, res) => {
     })
     .on('error', (error) => {
         console.error(error)
-        response.status = 500
-        response.body = { message: "Unknown error" }
+        response.send(500).send({message: "Unknown error"})
     })
     .on('end', () => {
         response = handleRequest(req, bodyStr)
-        res.writeHead(response.status, {'Content-Type': 'application/json'})
-        res.write(JSON.stringify(response.body))
+        res.statusCode = response.statusCode
+        if (typeof response.body === "object" || Array.isArray(response.body)) {
+            if (response.body instanceof HttpRequest)
+                response.body = response.body.toObject()
+
+            res.setHeader('Content-Type', 'application/json')
+            res.write(JSON.stringify(response.body))
+        }
+        else {
+            res.setHeader('Content-Type', 'text/plain')
+            res.write(response.body.toString())
+        }
         res.end()
     })
 })

@@ -1,4 +1,5 @@
 import { HttpRequest } from './request'
+import { HttpResponse } from './response'
 
 export const methods = [
     "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
@@ -7,10 +8,9 @@ export const methods = [
 
 export type Method = typeof methods[number]
 
-export type HttpResponse = {
-    status: number,
-    body: any
-}
+export type Serializable = number | string | boolean
+    | null | Serializable[]
+    | {[key: string | number]: Serializable | undefined}
 
 export type Callback = (
     request: HttpRequest,

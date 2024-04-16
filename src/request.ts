@@ -1,5 +1,5 @@
 import { IncomingHttpHeaders, IncomingMessage } from "http"
-import { Method } from "./types"
+import { Method, Serializable } from "./types"
 
 function extractQuery(url: string) {
     if (!url.includes('?'))
@@ -21,7 +21,7 @@ function getContentType(req: IncomingMessage) {
         )
 }
 
-export class HttpRequest {
+export abstract class GenericRequest {
     readonly url: string
     readonly host: string
     readonly hostname: string
@@ -33,14 +33,10 @@ export class HttpRequest {
     readonly contentType: string
     params: Map<string, string> = new Map()
 
-    private _bodyStr = ""
-    private _body: string | null = null
-
-    constructor(req: IncomingMessage, bodyStr: string) {
+    constructor(req: IncomingMessage) {
         this.query = extractQuery(req.url || "")
         this.headers = req.headers
         this.contentType = getContentType(req)
-        this._bodyStr = bodyStr
 
         this.url = req.url || ""
         this.host = req.headers.host || ""
@@ -48,17 +44,43 @@ export class HttpRequest {
         this.path = this.url.split('?')[0]
         this.method = (req.method || "") as Method
     }
+}
+
+export class HttpRequest extends GenericRequest {
+    private _bodyStr: string
+    private _body: Serializable | undefined
+
+    constructor(req: IncomingMessage, bodyStr: string) {
+        super(req)
+        this._bodyStr = bodyStr
+    }
 
     private parseBody() {
-        if (this.contentType === "application/json") {
+        if (this.contentType === "text/plain")
+            this._body = this._bodyStr
+        if (this.contentType === "application/json")
             this._body = this._bodyStr ? JSON.parse(this._bodyStr) : {}
-        }
     }
 
     get body() {
-        if (this._body === null) {
+        if (this._body === undefined) {
             this.parseBody()
         }
-        return this._body
+        return this._body as Serializable
+    }
+
+    toObject() {
+        const params = Array.from(this.params,
+            ([name, value]) => ({ name, value })
+        )
+        const query = Array.from(this.query,
+            ([name, value]) => ({ name, value })
+        )
+        return {
+            ...this, body: this.body,
+            params, query,
+            _bodyStr: undefined, _body: undefined,
+            toObject: undefined
+        }
     }
 }
