@@ -1,4 +1,4 @@
-import { GenericRequest } from './request'
+import { GenericRequest, HttpRequest } from './request'
 import { HttpResponse } from './response'
 
 export const methods = [
@@ -11,6 +11,8 @@ export type Method = typeof methods[number]
 export type Serializable = number | string | boolean
     | null | Serializable[]
     | {[key: string | number]: Serializable | undefined}
+
+export type RequestHandler = (request: HttpRequest) => HttpResponse
 
 export type Callback = (
     request: GenericRequest<Serializable>,

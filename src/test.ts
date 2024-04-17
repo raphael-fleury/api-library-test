@@ -1,4 +1,5 @@
-import { get, listen } from "."
+import { createServer } from "."
 
-get('/', (req, res) => res.send('Hello World'))
-listen(8080)
+createServer()
+    .get('/', (req, res) => res.send('Hello World'))
+    .listen(8080)
