@@ -21,7 +21,7 @@ function getContentType(req: IncomingMessage) {
         )
 }
 
-export abstract class GenericRequest {
+export abstract class GenericRequest<TBody> {
     readonly url: string
     readonly host: string
     readonly hostname: string
@@ -44,9 +44,11 @@ export abstract class GenericRequest {
         this.path = this.url.split('?')[0]
         this.method = (req.method || "") as Method
     }
+
+    abstract get body(): TBody
 }
 
-export class HttpRequest extends GenericRequest {
+export class HttpRequest extends GenericRequest<Serializable> {
     private _bodyStr: string
     private _body: Serializable | undefined
 
@@ -69,18 +71,12 @@ export class HttpRequest extends GenericRequest {
         return this._body as Serializable
     }
 
-    toObject() {
-        const params = Array.from(this.params,
-            ([name, value]) => ({ name, value })
-        )
-        const query = Array.from(this.query,
-            ([name, value]) => ({ name, value })
-        )
+    toObject(): GenericRequest<Serializable> {
         return {
-            ...this, body: this.body,
-            params, query,
-            _bodyStr: undefined, _body: undefined,
-            toObject: undefined
+            ...this,
+            body: this.body,
+            toObject: undefined,
+            _bodyStr: undefined, _body: undefined
         }
     }
 }

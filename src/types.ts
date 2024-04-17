@@ -1,4 +1,4 @@
-import { HttpRequest } from './request'
+import { GenericRequest } from './request'
 import { HttpResponse } from './response'
 
 export const methods = [
@@ -13,14 +13,14 @@ export type Serializable = number | string | boolean
     | {[key: string | number]: Serializable | undefined}
 
 export type Callback = (
-    request: HttpRequest,
+    request: GenericRequest<Serializable>,
     response: HttpResponse,
     next: () => void
 ) => any
 
 export type ErrorHandler = (
     error: unknown,
-    request: HttpRequest,
+    request: GenericRequest<Serializable>,
     response: HttpResponse,
     next: () => void
 ) => any

@@ -1,6 +1,6 @@
-import { IncomingMessage, createServer } from 'http'
+import { createServer } from 'http'
 import { routes, errorHandlers } from './'
-import { ErrorHandler, Method } from './types'
+import { ErrorHandler, Method, Route } from './types'
 import { HttpRequest } from './request'
 import { HttpResponse } from './response'
 
@@ -63,33 +63,23 @@ const defaultErrorHandler: ErrorHandler = (error, req, res, next) => {
     next()
 }
 
-function handleRequest(req: IncomingMessage, bodyStr: string) {
-    const request = new HttpRequest(req, bodyStr)
+function handleRequest(request: HttpRequest) {
     const response = new HttpResponse(200, '')
-
     try {
-        let matches = 0
-        for (const { path, method, callback } of routes) {
-            if (!routesMatching(req.url, path) || !methodsMatching(req.method, method))
-                continue
-    
-            matches++
-            request.params = extractParams(req.url || "", path)
+        const matches = routes.filter(({path, method}) =>
+            routesMatching(request.url, path) &&
+            methodsMatching(request.method, method))
         
-            let stop = true
-            const next = () => { stop = false }
-            
-            const cb = callback(request, response, next)
-            if (cb !== undefined)
-                response.body = cb
-            if (stop)
-                break
-        }
+        const resolvers = [() => {}]
+        matches.reverse().forEach(({path, callback}, index) => {
+            const req = request.toObject()
+            req.params = extractParams(request.url || "", path)
+            resolvers.push(() => callback(req, response, resolvers[index]))
+        })
+        resolvers.pop()!()
 
-        if (matches < 1) {
-            response.statusCode = 404
-            response.body = {message: "Not found"}
-        }
+        if (matches.length < 1)
+            response.status(400).send({message: "Not found"})
     }
     catch (error) {
         let stop = true
@@ -109,23 +99,16 @@ function handleRequest(req: IncomingMessage, bodyStr: string) {
 }
 
 export const server = createServer((req, res) => {
-    let response = new HttpResponse(200, '')
-
     let bodyStr = ''
     req.on('data', (chunk) => {
         bodyStr += chunk.toString()
     })
-    .on('error', (error) => {
-        console.error(error)
-        response.send(500).send({message: "Unknown error"})
-    })
     .on('end', () => {
-        response = handleRequest(req, bodyStr)
+        const request = new HttpRequest(req, bodyStr)
+        const response = handleRequest(request)
+
         res.statusCode = response.statusCode
         if (typeof response.body === "object" || Array.isArray(response.body)) {
-            if (response.body instanceof HttpRequest)
-                response.body = response.body.toObject()
-
             res.setHeader('Content-Type', 'application/json')
             res.write(JSON.stringify(response.body))
         }
