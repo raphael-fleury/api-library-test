@@ -82,17 +82,15 @@ function handleRequest(request: HttpRequest) {
             response.status(400).send({message: "Not found"})
     }
     catch (error) {
-        let stop = true
-        const next = () => { stop = false }
-
         response.statusCode = 500
-        for (const handler of [...errorHandlers, defaultErrorHandler]) {
-            const cb = handler(error, request, response, next)
-            if (cb !== undefined)
-                response.body = cb
-            if (stop)
-                break
-        }
+
+        const resolvers = [() => {}]
+        errorHandlers.reverse().forEach((handler, index) => {
+            resolvers.push(() => handler(
+                error, request, response, resolvers[index]
+            ))
+        })
+        defaultErrorHandler(error, request, response, resolvers.pop()!)
     }
 
     return response

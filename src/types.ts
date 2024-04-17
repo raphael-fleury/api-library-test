@@ -16,14 +16,14 @@ export type Callback = (
     request: GenericRequest<Serializable>,
     response: HttpResponse,
     next: () => void
-) => any
+) => void
 
 export type ErrorHandler = (
     error: unknown,
     request: GenericRequest<Serializable>,
     response: HttpResponse,
     next: () => void
-) => any
+) => void
 
 export type Route = {
     path: string,
